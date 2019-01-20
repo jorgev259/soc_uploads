@@ -16,7 +16,7 @@ app.use(busboy({
   highWaterMark: 2 * 1024 * 1024
 }))
 
-const uploadPath = path.join(require('os').homedir(), '../', config.path)
+const uploadPath = config.path
 fs.ensureDir(uploadPath)
 
 let directories = fs.readdirSync(uploadPath).filter(function (file) {
