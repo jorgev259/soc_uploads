@@ -12,6 +12,8 @@
     "axios": "^0.18.0",
     "connect-busboy": "^0.0.2",
     "express": "^4.16.3",
-    "fs-extra": "^5.0.0"
+    "fs-extra": "^5.0.0",
+    "multiparty": "^4.2.1",
+    "rimraf": "^2.6.3"
   }
 }
