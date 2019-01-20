@@ -1,0 +1,29 @@
+<html>
+    <head>
+
+    </head>
+    <body>
+        <form action="upload" id="uploadForm" method="post" enctype="multipart/form-data">
+            <input type="file" name="fileToUpload"><br>
+            <input type="submit">
+        </form>
+
+        <div>URL: <a id="url" href=""></a></div>
+    </body>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script>
+        var urlParams = new URLSearchParams(window.location.search)
+        if(urlParams.has('url')){
+             $('#url')[0].text = urlParams.get('url')
+             $('#url')[0].href = urlParams.get('url')
+        }
+
+        function refresh(){
+            axios.get('/uploads/server').then(res => {
+                $('#uploadForm')[0].action = `https://${res.data}/uploads`
+            })
+        }
+        refresh()
+    </script>
+</html>
