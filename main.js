@@ -57,7 +57,7 @@ app.get('/uploads/server', (req, res) => {
     if (servers.length === 0) servers = serverList.slice()
     res.send(server)
   } else {
-    get(`${req.protocol}://${config.master}/uploads/server`).then(query => {
+    get(`https://${config.master}/uploads/server`).then(query => {
       res.send(query.data)
     })
   }
