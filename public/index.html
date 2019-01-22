@@ -60,7 +60,8 @@
           chunkSize: 10 * 1024 * 1024,
           simultaneousUploads: 4,
           testChunks: false,
-          throttleProgressCallbacks: 1
+          throttleProgressCallbacks: 1,
+          forceChunkSize:true
         });
         // Resumable.js isn't supported, fall back on a different method
         if (!r.support) {
