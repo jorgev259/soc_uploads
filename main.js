@@ -13,6 +13,7 @@ var cors = require('cors')
 const app = express()
 
 app.options('*', cors())
+app.use(cors())
 app.use(multipart())
 
 const uploadPath = config.path
