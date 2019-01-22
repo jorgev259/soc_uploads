@@ -1,10 +1,13 @@
 const express = require('express')
-const busboy = require('connect-busboy')
+// const busboy = require('connect-busboy')
 const path = require('path')
 const fs = require('fs-extra')
 let options = { root: path.join(__dirname, 'public') }
 const { get } = require('axios')
 const config = require('./config.json')
+var resumable = require('./resumable-node.js')('./tmp/')
+var multipart = require('connect-multiparty')
+var crypto = require('crypto')
 
 const app = express()
 app.use(function (req, res, next) {
@@ -12,12 +15,14 @@ app.use(function (req, res, next) {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept')
   next()
 })
-app.use(busboy({
+app.use(multipart())
+/* app.use(busboy({
   highWaterMark: 2 * 1024 * 1024
-}))
+})) */
 
 const uploadPath = config.path
-fs.ensureDir(uploadPath)
+fs.ensureDirSync(uploadPath)
+fs.ensureDirSync('./tmp')
 
 let directories = fs.readdirSync(uploadPath).filter(function (file) {
   return fs.statSync(path.join(uploadPath, file)).isDirectory()
@@ -27,7 +32,7 @@ let serverList = []
 if (config.mode === 'master') serverList = config.servers
 let servers = serverList.slice()
 
-app.post('/uploads/', (req, res) => {
+/* app.post('/uploads/', (req, res) => {
   req.pipe(req.busboy) // Pipe it trough busboy
 
   req.busboy.on('file', (fieldname, file, filename) => {
@@ -46,6 +51,60 @@ app.post('/uploads/', (req, res) => {
       res.redirect(req.protocol + '://' + req.hostname + '/uploads?url=https://' + req.get('host') + '/pub/' + id + '/' + filename)
     })
   })
+}) */
+
+app.get('/fileid', function (req, res) {
+  if (!req.query.filename) {
+    return res.status(500).end('query parameter missing')
+  }
+  // create md5 hash from filename
+  res.end(
+    crypto.createHash('md5')
+      .update(req.query.filename)
+      .digest('hex')
+  )
+})
+
+// Handle uploads through Resumable.js
+app.post('/uploads', function (req, res) {
+  resumable.post(req, function (status, filename, original_filename, identifier, numberOfChunks) {
+    // console.log('POST', status, filename, original_filename, identifier)
+    if (status === 'done') {
+      console.log(`Merging ${filename}`)
+
+      var chunknames = []
+
+      let buffers = []
+      for (var i = 1; i <= numberOfChunks; i++) {
+        var uploadname = './tmp/resumable-' + identifier + '.' + i
+        chunknames.push(uploadname)
+        buffers.push(fs.readFileSync(uploadname))
+      }
+
+      let id = generate(10)
+      directories.push(id)
+
+      let dirPath = path.join(uploadPath, id)
+      fs.ensureDir(dirPath)
+
+      fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
+      console.log(`Saved ${filename}`)
+    }
+
+    res.send(status)
+  })
+})
+
+// Handle status checks on chunks through Resumable.js
+app.get('/uploads/state', function (req, res) {
+  resumable.get(req, function (status, filename, original_filename, identifier) {
+    console.log('GET', status)
+    res.send((status === 'found' ? 200 : 404), status)
+  })
+})
+
+app.get('/download/:identifier', function (req, res) {
+  resumable.write(req.params.identifier, res)
 })
 
 app.get('/uploads/server', (req, res) => {
@@ -66,6 +125,8 @@ app.get('/uploads/server', (req, res) => {
 app.get('/uploads/', (req, res) => {
   res.sendFile('index.html', options)
 })
+
+app.use('/uploads/', express.static(path.join(__dirname, '/public')))
 
 const server = app.listen(config.port, function () {
   console.log(`Listening on port ${server.address().port}`)
