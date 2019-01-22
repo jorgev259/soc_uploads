@@ -11,6 +11,7 @@
   "dependencies": {
     "axios": "^0.18.0",
     "connect-multiparty": "~1.1.0",
+    "cors": "^2.8.5",
     "express": "^4.16.3",
     "fs-extra": "^5.0.0"
   }
