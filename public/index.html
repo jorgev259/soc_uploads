@@ -57,7 +57,7 @@
       async function start() {
         r = new Resumable({
           target: await refresh(),
-          chunkSize: 90 * 1024 * 1024,
+          chunkSize: 10 * 1024 * 1024,
           simultaneousUploads: 4,
           testChunks: false,
           throttleProgressCallbacks: 1
