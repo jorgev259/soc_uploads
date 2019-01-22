@@ -16,9 +16,6 @@ app.use(function (req, res, next) {
   next()
 })
 app.use(multipart())
-/* app.use(busboy({
-  highWaterMark: 2 * 1024 * 1024
-})) */
 
 const uploadPath = config.path
 fs.ensureDirSync(uploadPath)
@@ -31,27 +28,6 @@ let directories = fs.readdirSync(uploadPath).filter(function (file) {
 let serverList = []
 if (config.mode === 'master') serverList = config.servers
 let servers = serverList.slice()
-
-/* app.post('/uploads/', (req, res) => {
-  req.pipe(req.busboy) // Pipe it trough busboy
-
-  req.busboy.on('file', (fieldname, file, filename) => {
-    console.log(`Upload of '${filename}' started`)
-
-    let id = generate(10)
-    let dirPath = path.join(uploadPath, id)
-    fs.ensureDir(dirPath)
-
-    const fstream = fs.createWriteStream(path.join(dirPath, filename))
-    file.pipe(fstream)
-
-    fstream.on('close', () => {
-      console.log(path.join(dirPath, filename))
-      console.log(`Upload of '${filename}' finished`)
-      res.redirect(req.protocol + '://' + req.hostname + '/uploads?url=https://' + req.get('host') + '/pub/' + id + '/' + filename)
-    })
-  })
-}) */
 
 app.get('/fileid', function (req, res) {
   if (!req.query.filename) {
@@ -67,11 +43,8 @@ app.get('/fileid', function (req, res) {
 
 // Handle uploads through Resumable.js
 app.post('/uploads', function (req, res) {
-  resumable.post(req, function (status, filename, original_filename, identifier, numberOfChunks) {
-    // console.log('POST', status, filename, original_filename, identifier)
+  resumable.post(req, function (status, filename, originalFilename, identifier, numberOfChunks) {
     if (status === 'done') {
-      console.log(`Merging ${filename}`)
-
       var chunknames = []
 
       let buffers = []
@@ -88,16 +61,17 @@ app.post('/uploads', function (req, res) {
       fs.ensureDir(dirPath)
 
       fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
-      console.log(`Saved ${filename}`)
-    }
+      let url = 'https://' + req.get('host') + '/pub/' + id + '/' + filename
 
-    res.send(status)
+      console.log(`Saved ${url}`)
+      res.send(url)
+    } else res.send(status)
   })
 })
 
 // Handle status checks on chunks through Resumable.js
 app.get('/uploads/state', function (req, res) {
-  resumable.get(req, function (status, filename, original_filename, identifier) {
+  resumable.get(req, function (status, filename, originalFilename, identifier) {
     console.log('GET', status)
     res.send((status === 'found' ? 200 : 404), status)
   })

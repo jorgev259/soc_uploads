@@ -2,12 +2,12 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <link rel="stylesheet" type="text/css" href="style.css" />
+    <link rel="stylesheet" type="text/css" href="/uploads/css/style.css" />
   </head>
   <body>
     <div id="frame">
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
-      <script src="resumable.js"></script>
+      <script src="/uploads/js/resumable.js"></script>
 
       <div class="resumable-error">
         Your browser, unfortunately, is not supported by Resumable.js. The library requires support for <a href="http://www.w3.org/TR/FileAPI/">the HTML5 File API</a> along with <a href="http://www.w3.org/TR/FileAPI/#normalization-of-params">file slicing</a>.
@@ -23,9 +23,9 @@
             <td width="100%"><div class="progress-container"><div class="progress-bar"></div></div></td>
             <td class="progress-text" nowrap="nowrap"></td>
             <td class="progress-pause" nowrap="nowrap">
-              <a href="#" onclick="r.upload(); return(false);" class="progress-resume-link"><img src="resume.png" title="Resume upload" /></a>
-              <a href="#" onclick="r.pause(); return(false);" class="progress-pause-link"><img src="pause.png" title="Pause upload" /></a>
-              <a href="#" onclick="r.cancel(); return(false);" class="progress-cancel-link"><img src="cancel.png" title="Cancel upload" /></a>
+              <a href="#" onclick="r.upload(); return(false);" class="progress-resume-link"><img src="uploads/img/resume.png" title="Resume upload" /></a>
+              <a href="#" onclick="r.pause(); return(false);" class="progress-pause-link"><img src="uploads/img/pause.png" title="Pause upload" /></a>
+              <a href="#" onclick="r.cancel(); return(false);" class="progress-cancel-link"><img src="uploads/img/cancel.png" title="Cancel upload" /></a>
             </td>
           </tr>
         </table>
@@ -35,7 +35,7 @@
 
       <script>
         var r = new Resumable({
-            target:'http://localhost/uploads',
+            target:'https://localhost/uploads',
             chunkSize:1*1024*1024,
             simultaneousUploads:4,
             testChunks:false,
@@ -74,7 +74,7 @@
             });
           r.on('fileSuccess', function(file,message){
               // Reflect that the file upload has completed
-              $('.resumable-file-'+file.uniqueIdentifier+' .resumable-file-progress').html('(completed)');
+              $('.resumable-file-'+file.uniqueIdentifier+' .resumable-file-progress').html(`/ URL: <a href="${message}">${message}</a>`);
             });
           r.on('fileError', function(file, message){
               // Reflect that the file upload has resulted in error

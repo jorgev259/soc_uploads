@@ -1,6 +1,8 @@
-var fs = require('fs-extra'); var path = require('path'); var util = require('util'); var Stream = require('stream').Stream
+/* eslint-disable standard/no-callback-literal */
+var fs = require('fs-extra')
+var path = require('path')
 
-module.exports = resumable = function (temporaryFolder) {
+module.exports = function (temporaryFolder) {
   var $ = this
   $.temporaryFolder = temporaryFolder
   $.maxFileSize = null
@@ -57,7 +59,7 @@ module.exports = resumable = function (temporaryFolder) {
     return 'valid'
   }
 
-  // 'found', filename, original_filename, identifier
+  // 'found', filename, originalFilename, identifier
   // 'not_found', null, null, null
   $.get = function (req, callback) {
     var chunkNumber = req.params['resumableChunkNumber'] || 0
@@ -68,7 +70,7 @@ module.exports = resumable = function (temporaryFolder) {
 
     if (validateRequest(chunkNumber, chunkSize, totalSize, identifier, filename) === 'valid') {
       var chunkFilename = getChunkFilename(chunkNumber, identifier)
-      fs.pathExists(chunkFilename, function (err, exists) {
+      fs.pathExists(chunkFilename, function (unusedErr, exists) {
         if (exists) {
           callback('found', chunkFilename, filename, identifier, chunkNumber)
         } else {
@@ -80,8 +82,8 @@ module.exports = resumable = function (temporaryFolder) {
     }
   }
 
-  // 'partly_done', filename, original_filename, identifier
-  // 'done', filename, original_filename, identifier
+  // 'partly_done', filename, originalFilename, identifier
+  // 'done', filename, originalFilename, identifier
   // 'invalid_resumable_request', null, null, null
   // 'non_resumable_request', null, null, null
   $.post = function (req, callback) {
@@ -94,7 +96,7 @@ module.exports = resumable = function (temporaryFolder) {
     var identifier = cleanIdentifier(fields['resumableIdentifier'])
     var filename = fields['resumableFilename']
 
-    var original_filename = fields['resumableIdentifier']
+    var originalFilename = fields['resumableIdentifier']
 
     if (!files[$.fileParameterName] || !files[$.fileParameterName].size) {
       callback('invalid_resumable_request', null, null, null, 0)
@@ -110,24 +112,24 @@ module.exports = resumable = function (temporaryFolder) {
         var currentTestChunk = 1
         var numberOfChunks = Math.max(Math.floor(totalSize / (chunkSize * 1.0)), 1)
         var testChunkExists = function () {
-          fs.pathExists(getChunkFilename(currentTestChunk, identifier), function (err, exists) {
+          fs.pathExists(getChunkFilename(currentTestChunk, identifier), function (unusedErr, exists) {
             if (exists) {
               currentTestChunk++
               if (currentTestChunk > numberOfChunks) {
-                callback('done', filename, original_filename, identifier, numberOfChunks)
+                callback('done', filename, originalFilename, identifier, numberOfChunks)
               } else {
                 // Recursion
                 testChunkExists()
               }
             } else {
-              callback('partly_done', filename, original_filename, identifier, currentTestChunk)
+              callback('partly_done', filename, originalFilename, identifier, currentTestChunk)
             }
           })
         }
         testChunkExists()
       })
     } else {
-      callback(validation, filename, original_filename, identifier, 0)
+      callback(validation, filename, originalFilename, identifier, 0)
     }
   }
 
@@ -146,7 +148,7 @@ module.exports = resumable = function (temporaryFolder) {
     // Iterate over each chunk
     var pipeChunk = function (number) {
       var chunkFilename = getChunkFilename(number, identifier)
-      fs.pathExists(chunkFilename, function (err, exists) {
+      fs.pathExists(chunkFilename, function (unusedErr, exists) {
         if (exists) {
           // If the chunk with the current number exists,
           // then create a ReadStream from the file
@@ -178,7 +180,7 @@ module.exports = resumable = function (temporaryFolder) {
       var chunkFilename = getChunkFilename(number, identifier)
 
       // console.log('removing pipeChunkRm ', number, 'chunkFilename', chunkFilename);
-      fs.pathExists(chunkFilename, function (err, exists) {
+      fs.pathExists(chunkFilename, function (unusedErr, exists) {
         if (exists) {
           console.log('exist removing ', chunkFilename)
           fs.unlink(chunkFilename, function (err) {

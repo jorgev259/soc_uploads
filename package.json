@@ -10,12 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^0.18.0",
-    "concat-files": "~0.1.0",
-    "connect-busboy": "^0.0.2",
     "connect-multiparty": "~1.1.0",
     "express": "^4.16.3",
-    "fs-extra": "^5.0.0",
-    "multiparty": "^4.2.1",
-    "rimraf": "^2.6.3"
+    "fs-extra": "^5.0.0"
   }
 }
