@@ -87,7 +87,8 @@ Promise.all(config.servers.map(server => {
       host: server.host,
       port: server.port,
       username: server.username,
-      password: server.password
+      password: server.password,
+      readyTimeout: server.timeout || 20000
     }
     sftp.connect(serverConfig).then(async () => {
       console.log(`Connection succesful ${server.name}`)
@@ -139,7 +140,8 @@ function testClient (serverConfig) {
       host: serverConfig.host,
       port: serverConfig.port,
       username: serverConfig.username,
-      password: serverConfig.password
+      password: serverConfig.password,
+      readyTimeout: serverConfig.timeout || 20000
     }).then(async () => {
       await sftp.end()
       resolve(true)
@@ -158,7 +160,8 @@ async function uploadRemote (buffers, filename, res, serverConfig) {
     host: serverConfig.host,
     port: serverConfig.port,
     username: serverConfig.username,
-    password: serverConfig.password
+    password: serverConfig.password,
+    readyTimeout: serverConfig.timeout || 20000
   })
 
   let dirs = (await sftp.list(serverConfig.path)).filter(f => f.type === 'd').map(f => f.name)
