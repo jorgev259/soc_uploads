@@ -183,7 +183,7 @@ async function uploadLocal (buffers, filename, res, serverConfig) {
   let dirPath = path.join(serverConfig.path, id)
   fs.ensureDirSync(dirPath)
 
-  fs.writeFileSync(path.join(serverConfig.path, filename), Buffer.concat(buffers))
+  fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
   let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
 
   console.log(`Saved ${url}`)
