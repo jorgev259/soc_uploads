@@ -104,6 +104,7 @@ Promise.all(config.servers.map(server => {
   const server = app.listen(config.port, () => {
     console.log(`Listening on port ${server.address().port}`)
   })
+  server.timeout = config.timeout || 120000
 })
 
 function generate (length, directories) {
