@@ -46,8 +46,6 @@ app.post('/uploads', function (req, res) {
         let serverConfig = await getClient()
         if (serverConfig.host === 'local') await uploadLocal(filename, res, serverConfig)
         else await uploadRemote(filename, res, serverConfig)
-
-        fs.remove(`./tmp_finished/${filename}`)
       })
 
       for (var i = 1; i <= numberOfChunks; i++) {
@@ -183,6 +181,7 @@ async function uploadRemote (filename, res, serverConfig) {
   sftp.mkdir(dirPath, true).then(() => {
     sftp.put(fs.createReadStream(`./tmp_finished/${filename}`), path.join(dirPath, filename).replace(/\\/g, '/')).then(() => {
       console.log(`Saved ${url}`)
+      fs.remove(`./tmp_finished/${filename}`)
     }).catch(err => console.log(err))
   }).catch(err => console.log(err))
 }
@@ -201,4 +200,6 @@ async function uploadLocal (filename, res, serverConfig) {
   // fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
   fs.copySync(`./tmp_finished/${filename}`, path.join(dirPath, filename))
   console.log(`Saved ${url}`)
+
+  fs.remove(`./tmp_finished/${filename}`)
 }
