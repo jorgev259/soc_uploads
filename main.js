@@ -8,6 +8,7 @@ var multipart = require('connect-multiparty')
 var crypto = require('crypto')
 
 fs.ensureDirSync('./tmp')
+fs.ensureDirSync('./tmp_finished')
 
 let Client = require('ssh2-sftp-client')
 let clients = {}
@@ -39,17 +40,23 @@ app.post('/uploads', function (req, res) {
     if (status === 'done') {
       var chunknames = []
 
-      let buffers = []
+      // let buffers = []
+      const file = fs.createWriteStream(`./tmp_finished/${filename}`)
+      file.on('finish', async () => {
+        let serverConfig = await getClient()
+        if (serverConfig.host === 'local') await uploadLocal(filename, res, serverConfig)
+        else await uploadRemote(filename, res, serverConfig)
+
+        fs.remove(`./tmp_finished/${filename}`)
+      })
+
       for (var i = 1; i <= numberOfChunks; i++) {
         var uploadname = './tmp/resumable-' + identifier + '.' + i
         chunknames.push(uploadname)
-        buffers.push(fs.readFileSync(uploadname))
+        file.write(fs.readFileSync(uploadname))
       }
 
-      let serverConfig = await getClient()
-      if (serverConfig.host === 'local') await uploadLocal(buffers, filename, res, serverConfig)
-      else await uploadRemote(buffers, filename, res, serverConfig)
-
+      file.end()
       chunknames.forEach(name => fs.remove(name))
     } else res.send(status)
   })
@@ -153,7 +160,7 @@ function testClient (serverConfig) {
   })
 }
 
-async function uploadRemote (buffers, filename, res, serverConfig) {
+async function uploadRemote (filename, res, serverConfig) {
   let sftp = new Client()
 
   await sftp.connect({
@@ -174,13 +181,13 @@ async function uploadRemote (buffers, filename, res, serverConfig) {
   res.send(url)
 
   sftp.mkdir(dirPath, true).then(() => {
-    sftp.put(Buffer.concat(buffers), path.join(dirPath, filename).replace(/\\/g, '/')).then(() => {
+    sftp.put(fs.createReadStream(`./tmp_finished/${filename}`), path.join(dirPath, filename).replace(/\\/g, '/')).then(() => {
       console.log(`Saved ${url}`)
     }).catch(err => console.log(err))
   }).catch(err => console.log(err))
 }
 
-async function uploadLocal (buffers, filename, res, serverConfig) {
+async function uploadLocal (filename, res, serverConfig) {
   fs.ensureDirSync(serverConfig.path)
   let dirs = fs.readdirSync(serverConfig.path)
   let id = generate(10, dirs)
@@ -191,6 +198,7 @@ async function uploadLocal (buffers, filename, res, serverConfig) {
   let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
   res.send(url)
 
-  fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
+  // fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
+  fs.copySync(`./tmp_finished/${filename}`, path.join(dirPath, filename))
   console.log(`Saved ${url}`)
 }
