@@ -47,8 +47,10 @@ app.post('/uploads', function (req, res) {
       }
 
       let serverConfig = await getClient()
-      if (serverConfig.host === 'local') uploadLocal(buffers, filename, res, serverConfig)
-      else uploadRemote(buffers, filename, res, serverConfig)
+      if (serverConfig.host === 'local') await uploadLocal(buffers, filename, res, serverConfig)
+      else await uploadRemote(buffers, filename, res, serverConfig)
+
+      chunknames.forEach(name => fs.remove(name))
     } else res.send(status)
   })
 })
@@ -184,8 +186,8 @@ async function uploadLocal (buffers, filename, res, serverConfig) {
   fs.ensureDirSync(dirPath)
 
   let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
-  console.log(`Saved ${url}`)
   res.send(url)
 
   fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
+  console.log(`Saved ${url}`)
 }
