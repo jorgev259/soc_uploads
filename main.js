@@ -165,12 +165,12 @@ async function uploadRemote (buffers, filename, res, serverConfig) {
 
   let dirPath = path.join(serverConfig.path, id).replace(/\\/g, '/')
 
+  let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
+  res.send(url)
+
   sftp.mkdir(dirPath, true).then(() => {
     sftp.put(Buffer.concat(buffers), path.join(dirPath, filename).replace(/\\/g, '/')).then(() => {
-      let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
-
       console.log(`Saved ${url}`)
-      res.send(url)
     }).catch(err => console.log(err))
   }).catch(err => console.log(err))
 }
@@ -183,9 +183,9 @@ async function uploadLocal (buffers, filename, res, serverConfig) {
   let dirPath = path.join(serverConfig.path, id)
   fs.ensureDirSync(dirPath)
 
-  fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
   let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
-
   console.log(`Saved ${url}`)
   res.send(url)
+
+  fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
 }
