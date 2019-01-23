@@ -122,9 +122,9 @@ async function getClient () {
   clientsUnused.splice(index, 1)
 
   let test = true
-  if (serverConfig.host !== 'local') test = await testClient(serverConfig)
 
   if (clientsUnused.length === 0) clientsUnused = clientIds.slice()
+  if (serverConfig.host !== 'local') test = await testClient(serverConfig)
 
   if (test) return serverConfig
   else return getClient()
