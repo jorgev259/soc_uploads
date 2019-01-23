@@ -1,57 +1,25 @@
 const express = require('express')
-// const busboy = require('connect-busboy')
 const path = require('path')
 const fs = require('fs-extra')
 let options = { root: path.join(__dirname, 'public') }
-const { get } = require('axios')
 const config = require('./config.json')
 var resumable = require('./resumable-node.js')('./tmp/')
 var multipart = require('connect-multiparty')
 var crypto = require('crypto')
 
+fs.ensureDirSync('./tmp')
+
+let Client = require('ssh2-sftp-client')
+let clients = {}
+let clientIds = []
+let clientsUnused = []
+
 var cors = require('cors')
 const app = express()
 
-/* app.use(cors());
-app.options('*', cors()); */
+app.use(cors())
+app.options('*', cors())
 app.use(multipart())
-app.use(function (req, res, next) {
-  var oneof = false
-  if (req.headers.origin) {
-    res.header('Access-Control-Allow-Origin', req.headers.origin)
-    oneof = true
-  }
-  if (req.headers['access-control-request-method']) {
-    res.header('Access-Control-Allow-Methods', req.headers['access-control-request-method'])
-    oneof = true
-  }
-  if (req.headers['access-control-request-headers']) {
-    res.header('Access-Control-Allow-Headers', req.headers['access-control-request-headers'])
-    oneof = true
-  }
-  if (oneof) {
-    res.header('Access-Control-Max-Age', 60 * 60 * 24 * 365)
-  }
-
-  // intercept OPTIONS method
-  if (oneof && req.method === 'OPTIONS') {
-    res.send(200)
-  } else {
-    next()
-  }
-})
-
-const uploadPath = config.path
-fs.ensureDirSync(uploadPath)
-fs.ensureDirSync('./tmp')
-
-let directories = fs.readdirSync(uploadPath).filter(function (file) {
-  return fs.statSync(path.join(uploadPath, file)).isDirectory()
-})
-
-let serverList = []
-if (config.mode === 'master') serverList = config.servers
-let servers = serverList.slice()
 
 app.get('/fileid', function (req, res) {
   if (!req.query.filename) {
@@ -67,7 +35,7 @@ app.get('/fileid', function (req, res) {
 
 // Handle uploads through Resumable.js
 app.post('/uploads', function (req, res) {
-  resumable.post(req, function (status, filename, originalFilename, identifier, numberOfChunks) {
+  resumable.post(req, async (status, filename, originalFilename, identifier, numberOfChunks) => {
     if (status === 'done') {
       var chunknames = []
 
@@ -78,17 +46,9 @@ app.post('/uploads', function (req, res) {
         buffers.push(fs.readFileSync(uploadname))
       }
 
-      let id = generate(10)
-      directories.push(id)
-
-      let dirPath = path.join(uploadPath, id)
-      fs.ensureDir(dirPath)
-
-      fs.writeFileSync(path.join(dirPath, filename), Buffer.concat(buffers))
-      let url = 'https://' + req.get('host') + '/pub/' + id + '/' + filename
-
-      console.log(`Saved ${url}`)
-      res.send(url)
+      let serverConfig = await getClient()
+      if (serverConfig.host === 'local') uploadLocal(buffers, filename, res, serverConfig)
+      else uploadRemote(buffers, filename, res, serverConfig)
     } else res.send(status)
   })
 })
@@ -105,36 +65,126 @@ app.get('/download/:identifier', function (req, res) {
   resumable.write(req.params.identifier, res)
 })
 
-app.get('/uploads/server', (req, res) => {
-  if (config.mode === 'master') {
-    let index = Math.floor(Math.random() * servers.length)
-    let server = servers[index]
-    servers.splice(index, 1)
-
-    if (servers.length === 0) servers = serverList.slice()
-    res.send(server)
-  } else {
-    get(`https://${config.master}/uploads/server`).then(query => {
-      res.send(query.data)
-    })
-  }
-})
-
 app.get('/uploads/', (req, res) => {
   res.sendFile('index.html', options)
 })
 
 app.use('/uploads/', express.static(path.join(__dirname, '/public')))
 
-const server = app.listen(config.port, function () {
-  console.log(`Listening on port ${server.address().port}`)
+Promise.all(config.servers.map(server => {
+  return new Promise((resolve, reject) => {
+    if (server.host === 'local') {
+      console.log(`Connection succesful ${server.name}`)
+      clients[server.name] = server
+      clientIds.push(server.name)
+      return resolve()
+    }
+
+    let sftp = new Client()
+    let serverConfig = {
+      host: server.host,
+      port: server.port,
+      username: server.username,
+      password: server.password
+    }
+    sftp.connect(serverConfig).then(async () => {
+      console.log(`Connection succesful ${server.name}`)
+      clients[server.name] = server
+      clientIds.push(server.name)
+      await sftp.end()
+      resolve()
+    }).catch(err => {
+      console.log(`Couldnt connect to ${server.name}`)
+      console.log(err)
+      resolve()
+    })
+  })
+})).then(() => {
+  clientsUnused = clientIds.slice()
+  const server = app.listen(config.port, () => {
+    console.log(`Listening on port ${server.address().port}`)
+  })
 })
 
-function generate (length) {
+function generate (length, directories) {
   var chars = '0123456789'
 
   var result = ''
   for (var i = length; i > 0; --i) { result += chars[Math.round(Math.random() * (chars.length - 1))] }
   if (directories.includes(result)) return generate(length)
   else return result
+}
+
+async function getClient () {
+  let index = Math.floor(Math.random() * clientsUnused.length)
+  let serverConfig = clients[clientsUnused[index]]
+  clientsUnused.splice(index, 1)
+
+  let test = true
+  if (serverConfig.host !== 'local') test = await testClient(serverConfig)
+
+  if (clientsUnused.length === 0) clientsUnused = clientIds.slice()
+
+  if (test) return serverConfig
+  else return getClient()
+}
+
+function testClient (serverConfig) {
+  return new Promise((resolve, reject) => {
+    let sftp = new Client()
+    sftp.connect({
+      host: serverConfig.host,
+      port: serverConfig.port,
+      username: serverConfig.username,
+      password: serverConfig.password
+    }).then(async () => {
+      await sftp.end()
+      resolve(true)
+    }).catch(err => {
+      console.log(`Couldnt connect to ${serverConfig.host}`)
+      console.log(err)
+      resolve(false)
+    })
+  })
+}
+
+async function uploadRemote (buffers, filename, res, serverConfig) {
+  let sftp = new Client()
+
+  await sftp.connect({
+    host: serverConfig.host,
+    port: serverConfig.port,
+    username: serverConfig.username,
+    password: serverConfig.password
+  })
+
+  let dirs = (await sftp.list(serverConfig.path)).filter(f => f.type === 'd').map(f => f.name)
+
+  let id = generate(10, dirs)
+
+  let dirPath = path.join(serverConfig.path, id).replace(/\\/g, '/')
+
+  sftp.mkdir(dirPath, true).then(() => {
+    sftp.put(Buffer.concat(buffers), path.join(dirPath, filename).replace(/\\/g, '/')).then(() => {
+      let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
+
+      console.log(`Saved ${url}`)
+      res.send(url)
+    }).catch(err => console.log(err))
+  }).catch(err => console.log(err))
+}
+
+async function uploadLocal (buffers, filename, res, serverConfig) {
+  fs.ensureDirSync(serverConfig.path)
+  let dirs = fs.readdirSync(serverConfig.path)
+  let id = generate(10, dirs)
+
+  let dirPath = path.join(serverConfig.path, id)
+  fs.ensureDirSync(dirPath)
+
+  fs.writeFileSync(path.join(serverConfig.path, filename), Buffer.concat(buffers))
+  let url = 'https://' + serverConfig.name + '/pub/' + id + '/' + filename
+
+  console.log(`Saved ${url}`)
+  res.send(url)
 }
