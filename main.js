@@ -17,10 +17,41 @@ let clientsUnused = []
 
 var cors = require('cors')
 const app = express()
+const bodyParser = require('body-parser')
 
 app.use(cors())
 app.options('*', cors())
 app.use(multipart())
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
+var session = require('express-session')
+var MemoryStore = require('memorystore')(session)
+
+app.use(session({
+  store: new MemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  }),
+  secret: config.secret,
+  resave: false,
+  saveUninitialized: false
+}))
+
+app.post('/login', function (req, res) {
+  fs.readFile('./config.json').then(buffer => {
+    let { users } = JSON.parse(buffer.toString())
+    if (!Object.keys(users).includes(req.body.user) || req.body.pass !== users[req.body.user]) return res.status(500).send('Authentication error')
+
+    req.session.user = req.body.user
+    res.status(200).send('Login Successful')
+  })
+})
+
+app.post('/logout', function (req, res) {
+  req.session.destroy(function () {
+    res.end()
+  })
+})
 
 app.get('/fileid', function (req, res) {
   if (!req.query.filename) {
@@ -72,8 +103,12 @@ app.get('/download/:identifier', function (req, res) {
   resumable.write(req.params.identifier, res)
 })
 
-app.get('/uploads/', (req, res) => {
+app.get('/uploads/', checkLogin, (req, res) => {
   res.sendFile('index.html', options)
+})
+
+app.get('/login/', (req, res) => {
+  res.sendFile('login.html', options)
 })
 
 app.use('/uploads/', express.static(path.join(__dirname, '/public')))
@@ -184,6 +219,11 @@ async function uploadRemote (filename, res, serverConfig) {
       fs.remove(`./tmp_finished/${filename}`)
     }).catch(err => console.log(err))
   }).catch(err => console.log(err))
+}
+
+function checkLogin (req, res, next) {
+  if (req.session.user) next()
+  else res.redirect('/login')
 }
 
 async function uploadLocal (filename, res, serverConfig) {
